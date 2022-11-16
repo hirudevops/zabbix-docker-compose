@@ -1,0 +1,80 @@
+version: '3.5'
+services:
+ mysql-server:
+  container_name: mysql-server 
+  image: mysql
+  networks:
+   - zbx_net
+  command:
+   - mysqld
+   - --character-set-server=utf8
+   - --collation-server=utf8_bin
+   - --default-authentication-plugin=mysql_native_password
+  env_file:
+   - ./env_vars/.env_mysql_server
+  volumes:
+   - ./zabbix-vol/zabbix-mysql:/var/lib/mysql
+
+#Zabbix server
+ zabbix-server:
+  container_name: zabbix-server
+  hostname: zabbix-server
+  image: zabbix/zabbix-server-mysql
+  networks:
+   - zbx_net
+  ports:
+   - 10051:10051
+  volumes:
+   - /etc/localtime:/etc/localtime:ro
+   - /etc/timezone:/etc/timezone:ro 
+   - ./zabbix-vol/zabbix-data/alertscripts:/usr/lib/zabbix/alertscripts
+   - ./zabbix-vol/zabbix-data/externalscripts:/usr/lib/zabbix/externalscripts
+   - ./zabbix-vol/zabbix-data/export:/var/lib/zabbix/export
+   - ./zabbix-vol/zabbix-data/modules:/var/lib/zabbix/modules
+   - ./zabbix-vol/zabbix-data/enc:/var/lib/zabbix/enc
+   - ./zabbix-vol/zabbix-data/ssh_keys:/var/lib/zabbix/ssh_keys
+   - ./zabbix-vol/zabbix-data/mibs:/var/lib/zabbix/mibs
+   - ./zabbix-vol/zabbix-data/snmptraps:/var/lib/zabbix/snmptraps
+  env_file:
+   - ./env_vars/.env_zabbix_server
+  depends_on:
+   - mysql-server
+  links:
+   - mysql-server:mysql-server
+
+#Zabbix frontend web nginx
+ zabbix-web-nginx:
+  container_name: zabbix-web-nginx
+  image: zabbix/zabbix-web-nginx-mysql
+  networks:
+   - zbx_net
+  ports:
+   - 80:8080
+   - 443:8443
+  volumes:
+   - /etc/localtime:/etc/localtime
+   - /etc/timezone:/etc/timezone
+   - ./zabbix-vol/zabbix-nginx/nginx:/etc/ssl/nginx
+   - ./zabbix-vol/zabbix-nginx/modules/:/usr/share/zabbix/modules/
+  env_file:
+    - ./env_vars/.env_web_nginx
+  depends_on:
+   - mysql-server
+   - zabbix-server
+  links:
+   - mysql-server:mysql-server
+   - zabbix-server:zabbix-server
+
+#Zabbix Java Gateway
+ zabbix-java-gateway:
+  container_name: zabbix-java-gateway
+  image: zabbix/zabbix-java-gateway
+  networks:
+   - zbx_net
+  ports:
+   - 10052:10052
+
+#Network for Zabbix
+networks:
+ zbx_net:
+   driver: bridge
